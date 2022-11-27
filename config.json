@@ -1,0 +1,30 @@
+{
+  "gravity":9.81,
+  "mass": 0.1,
+  "rotors":[
+      {
+        "id":0,
+        "maxSpeed": 4,
+        "angle": 45,
+        "armLength": 0.05
+      },
+      {
+        "id":1,
+        "maxSpeed":4,
+        "angle": 135,
+        "armLength": 0.05
+      },
+      {
+        "id":2,
+        "maxSpeed":4,
+        "angle": 225,
+        "armLength": 0.05
+      },
+      {
+        "id":3,
+        "maxSpeed":4,
+        "angle": 315,
+        "armLength": 0.05
+      }
+  ]
+}
