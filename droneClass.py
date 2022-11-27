@@ -8,18 +8,21 @@ positionHistory = [[[], [], []], [[], [], []]]
 
 
 class Drone():
-    def __init__(self, data, logHistory=False):
+    def __init__(self, data, logHistory=False,):
         self.mass = .5
 
         self.dimensions = [0.1, 0.1, 0.05]
 
-        self.position = [0, 0, 100]
+        self.position = [0, 0, 250]
         self.velocity = [0, 0, 0]
         self.acceleration = [0, 0, 0]   
 
         self.anglePosition = [0, 0, 0]
         self.angleVelocity = [0, 0, 0]
         self.angleAcceleration = [0, 0, 0]
+
+        self.colour = (50 + randint(-50, 50), 235 + randint(-20, 20), 50 + randint(-50, 50))
+
 
         self.target = 0
 
@@ -68,22 +71,17 @@ class Drone():
             return self.mass * (self.dimensions[0] ** 2 + self.dimensions[1] ** 2) / 12
 
 
-    def tick(self, height=1, angle=(0, 0, 0), hoops=[]):
-
-        #self.print()
+    def tick(self, height=1, angle=(0, 0, 0), hoops=[], time=0):
 
         distance1 = sqrt((hoops[self.target].position[0] - self.position[0]) ** 2 +
-                        (hoops[self.target].position[1] - self.position[1]) ** 2 +
-                        (hoops[self.target].position[2] - self.position[2]) ** 2)
+                         (hoops[self.target].position[1] - self.position[1]) ** 2 +
+                         (hoops[self.target].position[2] - self.position[2]) ** 2)
 
         self.updateMovement()
         self.updateAngles()
 
-        for i in range(3):
-            self.angleVelocity[i] += self.angleAcceleration[i] * self.tickSpeed
-            self.anglePosition[i] += self.angleVelocity[i] * self.tickSpeed
 
-        #self.control(positionTarget=(0, 0, height), angleTarget=angle)
+        self.control(positionTarget=(0, 0, height), angleTarget=angle)
 
         if self.position[2] <= 0 and self.acceleration[2] < 0:
             self.acceleration[2] = 0
@@ -92,24 +90,25 @@ class Drone():
 
         angleAccel = sqrt(self.angleAcceleration[0] ** 2 + self.angleAcceleration[1] ** 2 + self.angleAcceleration[2] ** 2)
 
-        if angleAccel > 10:
-            return -1
+
 
         distance2 = sqrt((hoops[self.target].position[0] - self.position[0]) ** 2 +
                         (hoops[self.target].position[1] - self.position[1]) ** 2 +
                         (hoops[self.target].position[2] - self.position[2]) ** 2)
 
-        if distance2 < 25:
+        if distance1 < 12.5:
 
             self.target += 1
             if self.target >= len(hoops):
                 self.target = 0
-            return 10
+            return 25 * (self.target + 1) * (250 - time) / 250
 
         if self.logHistory:
             self.updatePositionHistory()
+        #val = 50 / (distance2 * 100) + (distance1 - distance2) / 100
+        val = (distance1 - distance2) / 100
 
-        return 50 / (distance2 * 100) - abs(self.position[2] - 100) / 10000
+        return val
 
     def updateMovement(self):
         rotorForce = 0
@@ -144,6 +143,10 @@ class Drone():
                        self.rotorArmLength[i]
         self.angleAcceleration[1] = MyTotal / self.inertia('y')
 
+        for i in range(3):
+            self.angleVelocity[i] += self.angleAcceleration[i] * self.tickSpeed
+            self.angleVelocity[i] *= self.windDamping
+            self.anglePosition[i] += self.angleVelocity[i] * self.tickSpeed
 
     def control(self, positionTarget=(0, 0, 1), angleTarget=(0, 0, 0)):
         hc = self.hoverControl(positionTarget)
@@ -151,13 +154,13 @@ class Drone():
         for i in range(4):
             self.rotorDuty[i] = hc[i]
 
-        #rc = self.rollControl(angleTarget)
-        #for i in range(4):
-        #    self.rotorDuty[i] += rc[i]
+        rc = self.rollControl(angleTarget)
+        for i in range(4):
+            self.rotorDuty[i] += rc[i]
 
-        #pc = self.pitchControl(angleTarget)
-        #for i in range(4):
-        #   self.rotorDuty[i] += pc[i]
+        pc = self.pitchControl(angleTarget)
+        for i in range(4):
+           self.rotorDuty[i] += pc[i]
 
         for i, duty in enumerate(self.rotorDuty):
             if duty < 0 or duty > 1:

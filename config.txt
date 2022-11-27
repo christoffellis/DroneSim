@@ -1,7 +1,7 @@
 [NEAT]
 fitness_criterion     = max
 fitness_threshold     = 10000
-pop_size              = 400
+pop_size              = 350
 reset_on_extinction   = True
 
 [DefaultGenome]
@@ -16,11 +16,11 @@ aggregation_mutate_rate = 0.0
 aggregation_options     = sum
 
 # node bias options
-bias_init_mean          = 0.0
-bias_init_stdev         = 1.0
-bias_max_value          = 300.0
-bias_min_value          = -300.0
-bias_mutate_power       = 0.5
+bias_init_mean          = 350.0
+bias_init_stdev         = 4.0
+bias_max_value          = 500.0
+bias_min_value          = 0.0
+bias_mutate_power       = 2
 bias_mutate_rate        = 0.4
 bias_replace_rate       = 0.1
 
@@ -33,41 +33,41 @@ conn_add_prob           = 0.25
 conn_delete_prob        = 0.25
 
 # connection enable options
-enabled_default         = False
-enabled_mutate_rate     = 0.1
+enabled_default         = True
+enabled_mutate_rate     = 0.15
 
 feed_forward            = True
 initial_connection      = full_nodirect
 
 # node add/remove rates
-node_add_prob           = 0.2
-node_delete_prob        = 0.2
+node_add_prob           = 0.25
+node_delete_prob        = 0.25
 
 # network parameters
-num_hidden              = 2
-num_inputs              = 24
-num_outputs             = 5
+num_hidden              = 8
+num_inputs              = 12
+num_outputs             = 3
 
 # node response options
 response_init_mean      = 1.0
-response_init_stdev     = 0.0
-response_max_value      = 300.0
-response_min_value      = -300.0
-response_mutate_power   = 0.5
+response_init_stdev     = 4.0
+response_max_value      = 100.0
+response_min_value      = -100.0
+response_mutate_power   = 2
 response_mutate_rate    = 0.4
 response_replace_rate   = 0.1
 
 # connection weight options
-weight_init_mean        = 0.0
-weight_init_stdev       = 1.0
-weight_max_value        = 300
-weight_min_value        = -300
-weight_mutate_power     = 0.5
+weight_init_mean        = 2.0
+weight_init_stdev       = 4.0
+weight_max_value        = 100
+weight_min_value        = -100
+weight_mutate_power     = 2
 weight_mutate_rate      = 0.4
 weight_replace_rate     = 0.1
 
 [DefaultSpeciesSet]
-compatibility_threshold = 3.0
+compatibility_threshold = 5.0
 
 [DefaultStagnation]
 species_fitness_func = max

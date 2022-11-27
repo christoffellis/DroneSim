@@ -1,4 +1,5 @@
 import os.path
+import pickle
 import random
 import time
 
@@ -36,11 +37,13 @@ def drawDrone(screen, drone):
     length = 100 * zoomMultiplier
 
     for i in range(45, 405, 360 // 4):
-        points.append([
-            length * cos(radians(i)) + drone.position[0] * zoomMultiplier,
-            length * sin(radians(i)) + drone.position[1] * zoomMultiplier,
-            -drone.position[2] * zoomMultiplier
-        ])
+        points.append(rotateIn3D(drone.anglePosition,
+                                    [
+                                        length * cos(radians(i)),
+                                        length * sin(radians(i)),
+                                        0
+                                    ],
+                                 drone.position, zoomMultiplier))
 
     newPoints = []
     for point in points:
@@ -49,27 +52,25 @@ def drawDrone(screen, drone):
     for i, point in enumerate(newPoints):
         points[i] = [point[0], point[1]]
 
-    pygame.draw.polygon(screen, (25, 255, 25), points)
+    pygame.draw.polygon(screen, drone.colour, points)
 
     linePoint1 = transformTo2D(rotateIn3D(drone.anglePosition,
-                                          [drone.position[0] * zoomMultiplier, drone.position[1] * zoomMultiplier,
-                                           -drone.position[2] * zoomMultiplier]))
-    linePoint2 = transformTo2D(rotateIn3D(drone.anglePosition, [length + drone.position[0] * zoomMultiplier,
-                                                                drone.position[1] * zoomMultiplier,
-                                                                -drone.position[2] * zoomMultiplier]))
+                                          [0, 0, 0], drone.position, zoomMultiplier))
+    linePoint2 = transformTo2D(rotateIn3D(drone.anglePosition, [length, 0, 0], drone.position, zoomMultiplier))
 
     pygame.draw.line(screen, (255, 255, 255), linePoint1, linePoint2)
 
 
 def drawShadow(screen, drone):
+    # TODO: fix shadow
     points = []
     length = 100 * zoomMultiplier
     for i in range(45, 405, 360 // 4):
-        points.append([
+        points.append(rotateIn3D(drone.anglePosition, [
             length * cos(radians(i)) + drone.position[0] * zoomMultiplier,
             length * sin(radians(i)) + drone.position[1] * zoomMultiplier,
             0
-        ])
+        ]))
     newPoints = []
     for point in points:
         threeD = rotateIn3D(drone.anglePosition, point)
@@ -82,7 +83,7 @@ def drawShadow(screen, drone):
     pygame.draw.polygon(screen, (156, 30, 30), points)
 
 
-def drawEnvironment(screen, drone):
+def drawEnvironment(screen):
     points = []
     length = 1000 * zoomMultiplier
     for i in range(0, 360, 360 // 4):
@@ -107,7 +108,7 @@ def transformTo2D(point):
     return [x, y]
 
 
-def rotateIn3D(anglePosition, position):
+def rotateIn3D(anglePosition, position, addPosition = [0, 0, 0], zoomMultiplier = 1):
     c = radians(anglePosition[0])
     b = radians(anglePosition[1])
     a = radians(anglePosition[2])  # + viewPhiAngle)
@@ -122,7 +123,7 @@ def rotateIn3D(anglePosition, position):
     newZ = x * (sin(c) * sin(a) - cos(c) * sin(b) * cos(a)) + y * (
             cos(c) * sin(b) * sin(a) + sin(c) * cos(a)) + z * cos(c) * cos(b)
 
-    return [newX, newY, newZ]
+    return [newX + addPosition[0] * zoomMultiplier, newY + addPosition[1] * zoomMultiplier, newZ - addPosition[2] * zoomMultiplier]
 
 def add3D(point, position):
     for i in range(3):
@@ -196,7 +197,7 @@ def drawTargetLine(drone):
         )
     )
 
-    dronePos = transformTo2D(rotateIn3D(drone.anglePosition,
+    dronePos = transformTo2D(rotateIn3D((0, 0, 0),
                                         [drone.position[0] * zoomMultiplier, drone.position[1] * zoomMultiplier,
                                          -drone.position[2] * zoomMultiplier]))
     pygame.draw.line(screen, (25, 25, 255), dronePos, pos, width=2)
@@ -220,17 +221,18 @@ def genHoops():
                 ]
             ))
     '''
-    angle = random.randint(0, 360)
-    for i in range(100, 3000, 75):
-        angle += random.randint(-5, 5)
+
+    angle = 45
+    for i in range(175, 3000, 75):
+        angle += random.randint(-25, 25) / 10
         hoops.append(
             hoop((
                 cos(radians(angle)) * i,
                 sin(radians(angle)) * i,
-                100
+                200
             )
             ))
-
+    random.seed()
 
 def drawHoops(drone):
     for j, hoop in enumerate(hoops):
@@ -248,6 +250,11 @@ def drawHoops(drone):
         if j < drone.target:
             pygame.draw.circle(screen, (50, 50, 255), pos, int(11 * zoomMultiplier), width=2)
 
+def drawGenInfo(screen, fitness, generation, time):
+    writeText(screen, "Fit: " + str(fitness), 2, size[1] - 60, 18, (0, 0, 0), False)
+    writeText(screen, "Gen: " + str(generation), 2, size[1] - 40, 18, (0, 0, 0), False)
+    writeText(screen, "Tmr: " + str(time) + "/250", 2, size[1] - 20, 18, (0, 0, 0), False)
+
 
 def run(configPath):
     config = neat.config.Config(neat.DefaultGenome, neat.DefaultReproduction, neat.DefaultSpeciesSet,
@@ -257,18 +264,21 @@ def run(configPath):
 
     p.add_reporter(neat.StdOutReporter(True))
     p.add_reporter(neat.StatisticsReporter())
-
-    winner = p.run(main, 50000)
+    genHoops()
+    winner = p.run(main, 5000000)
 
 
 showInfo = False
 infoOffset = 0
+
+showDrones = True
 
 counterLimit = 0
 
 
 def main(genomes, config):
     drones = []
+    droneInstructions = []
     ge = []
     nets = []
 
@@ -276,6 +286,7 @@ def main(genomes, config):
         net = neat.nn.FeedForwardNetwork.create(g, config)
         nets.append(net)
         drones.append(Drone(data))
+        droneInstructions.append([350, 0, 0])
         g.fitness = 0
         ge.append(g)
 
@@ -287,8 +298,9 @@ def main(genomes, config):
     global showInfo
     global infoOffset
     global counterLimit
+    global showDrones
 
-    targetHeight = 100
+    targetHeight = 350
     pressHeightValue = 0
 
     pressPitchValue = 0
@@ -300,8 +312,9 @@ def main(genomes, config):
     startTime = time.time()
     screenshotCount = 0
 
-    genHoops()
+
     counter = 0
+    highIndex = 0
     while True:
         for event in pygame.event.get():
             if event.type == pygame.KEYDOWN:
@@ -316,8 +329,11 @@ def main(genomes, config):
                     showInfo = not showInfo
 
                 if event.key == pygame.K_o:
-                    pygame.image.save(screen, str(screenshotCount) + "_screenshot.jpg")
-                    screenshotCount += 1
+                    showDrones = not showDrones
+
+                #if event.key == pygame.K_o:
+                #    pygame.image.save(screen, str(screenshotCount) + "_screenshot.jpg")
+                #    screenshotCount += 1
 
                 if event.key == pygame.K_p:
                     changingAngle = (changingAngle + 1) % 3
@@ -388,9 +404,10 @@ def main(genomes, config):
             targetHeight = 0
 
         for x, drone in enumerate(drones):
-            tickVal = drone.tick(height=targetHeight,
-                                 angle=(pressRollValue * -15, pressPitchValue * -15, pressYawValue * -15),
-                                 hoops=hoops)
+            tickVal = drone.tick(height=200 + droneInstructions[x][0],
+                                 angle=(droneInstructions[x][1] * 45 - 22.5, droneInstructions[x][2] * 45 - 22.5, 0),
+                                 hoops=hoops,
+                                 time=counter)
 
             if tickVal == -100:
                 drones.pop(x)
@@ -398,49 +415,43 @@ def main(genomes, config):
                 nets.pop(x)
             else:
                 ge[x].fitness += tickVal
+                if highIndex < len(ge) - 1:
+                    if ge[x].fitness > ge[highIndex].fitness:
+                        highIndex = x
+                else:
+                    highIndex = 0
 
                 output = nets[x].activate(
                     (
-                        drone.position[0],
-                        drone.position[1],
-                        drone.position[2],
-                        drone.velocity[0],
-                        drone.velocity[1],
-                        drone.velocity[2],
+                        drone.position[0] - hoops[drone.target].position[0],
+                        drone.position[0] - hoops[drone.target].position[1],
+                        drone.position[0] - hoops[drone.target].position[2],
                         drone.acceleration[0],
                         drone.acceleration[1],
                         drone.acceleration[2],
                         drone.anglePosition[0],
                         drone.anglePosition[1],
                         drone.anglePosition[2],
-                        drone.angleVelocity[0],
-                        drone.angleVelocity[1],
-                        drone.angleVelocity[2],
                         drone.angleAcceleration[0],
                         drone.angleAcceleration[1],
                         drone.angleAcceleration[2],
-                        hoops[drone.target].position[0],
-                        hoops[drone.target].position[1],
-                        hoops[drone.target].position[2],
-                        hoops[drone.target + 1].position[0],
-                        hoops[drone.target + 1].position[1],
-                        hoops[drone.target + 1].position[2],
                     )
                 )
 
-                drone.rotorDuty[0] += (output[4] + output[0] + output[2] + output[3]) / 100
-                drone.rotorDuty[1] += (output[4] + output[1] + output[2] - output[3]) / 100
-                drone.rotorDuty[2] += (output[4] - output[0] - output[2] - output[3]) / 100
-                drone.rotorDuty[3] += (output[4] - output[1] - output[2] + output[3]) / 100
+                droneInstructions[x] = output
+
+                for i in range(4):
+                    drone.rotorDuty[i] = min(max(drone.rotorDuty[i], 0), 1)
 
         if len(drones) > 0:
-            if counterLimit % 5 == 0:
-                drawEnvironment(screen, drones[0])
-                drawShadow(screen, drones[0])
+            if showDrones:
+                drawEnvironment(screen)
+                drawShadow(screen, drones[highIndex])
                 for drone in drones:
                     drawDrone(screen, drone)
-                drawHoops(drones[0])
-                drawTargetLine(drones[0])
+                drawHoops(drones[highIndex])
+                drawTargetLine(drones[highIndex])
+            drawGenInfo(screen, ge[highIndex].fitness, counterLimit, counter)
         else:
             break
 
@@ -453,13 +464,16 @@ def main(genomes, config):
         if infoOffset > 0:
             drawInfoDialog(size[0] - infoOffset, screen)
 
-        pygame.time.wait(100 // 60)
+        #pygame.time.wait(100 // 60)
         counter += 1
 
         if counter > 250:
             counterLimit += 1
             break
         pygame.display.flip()
+
+    with open("recent.p", "wb") as f:
+        pickle.dump([ge, drones, nets, counterLimit], f)
 
 
 if __name__ == "__main__":
